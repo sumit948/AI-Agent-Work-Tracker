@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { Header } from '@/components/header';
 import { analyticsApi } from '@/lib/api/analytics-api';
-import { AnalyticsSummary, categoryColors, categoryLabel } from '@/lib/work-tracker-types';
+import { AnalyticsSummary, categoryColors, categoryLabel, DEMO_ANALYTICS } from '@/lib/work-tracker-types';
 import {
   BarChart, Bar, LineChart, Line, PieChart, Pie, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer
@@ -12,10 +12,12 @@ import { TrendingUp, Calendar, Target, Zap, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { useAuth } from '@/lib/auth-context';
 
 const CHART_COLORS = ['#7c3aed', '#10b981', '#f59e0b', '#ef4444', '#06b6d4', '#ec4899'];
 
 export default function AnalyticsPage() {
+  const { isDemoMode } = useAuth();
   const today = new Date().toISOString().split('T')[0];
   const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
 
@@ -25,6 +27,11 @@ export default function AnalyticsPage() {
   const [loading, setLoading] = useState(true);
 
   const load = (start: string, end: string) => {
+    if (isDemoMode) {
+      setAnalytics(DEMO_ANALYTICS);
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     analyticsApi.getSummary(start, end)
       .then(setAnalytics)
@@ -32,7 +39,8 @@ export default function AnalyticsPage() {
       .finally(() => setLoading(false));
   };
 
-  useEffect(() => { load(startDate, endDate); }, []);
+  useEffect(() => { load(startDate, endDate); }, [isDemoMode]);
+
 
   const categoryData = (analytics?.categoryBreakdown ?? []).map((c, i) => ({
     name: categoryLabel[c.category] ?? c.category,

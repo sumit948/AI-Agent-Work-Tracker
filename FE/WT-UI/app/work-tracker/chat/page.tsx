@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import { useState, useRef, useEffect } from 'react';
 import { Header } from '@/components/header';
@@ -7,6 +7,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { chatApi } from '@/lib/api/chat-api';
 import { ApiError } from '@/lib/api-client';
 import { Send, Loader2, MessageSquare, Lightbulb } from 'lucide-react';
+import { useAuth } from '@/lib/auth-context';
 
 interface Message {
   id: string;
@@ -24,7 +25,26 @@ const suggestedQuestions = [
   'Which categories did I work on most?',
 ];
 
+const DEMO_RESPONSES: Record<string, string> = {
+  default: 'Based on your work logs this week, you\'ve completed 12 tasks totalling 23.5 hours. Feature development was your primary focus at 53% of your time (12.5h), followed by bug fixes at 19% (4.5h). Your most productive day was yesterday with 5.5 hours logged across 2 tasks.',
+  'last week': 'Last week you logged 23.5 hours across 12 tasks. Highlights: delivered AI-powered log structuring, fixed 3 bugs including a critical JWT auth issue, and optimised database queries for a 40% performance gain. Your productivity score was 82%.',
+  'bug': 'You spent 4.5 hours on bug fixes this week across 3 bug tasks. That\'s about 19% of your total work time. The most time-intensive bug was the JWT token expiration fix (2.5h).',
+  'most time': 'Your most time-intensive task was "Implemented AI log structuring with OpenAI" at 4.0 hours. Close behind was "Built REST API endpoints for user dashboard" at 3.5h and "Optimised database queries" at 3.0h.',
+  'productivity': 'Your productivity trend is strong! You went from 2.0h on Monday to a peak of 5.5h on Thursday, then maintained 4.0h today. Your 7-day productivity score is 82%, above the typical 70-75% baseline.',
+  'meeting': "You attended 2 meetings this week totalling 1.5 hours: the daily standup & sprint planning (1.0h) and a 1:1 with your engineering manager (0.5h). That's 6% of your work time - a healthy balance.",
+  'categories': "Category breakdown this week: Feature (53%, 12.5h), Bug (19%, 4.5h), Other (9%, 2.0h), Review (11%, 2.5h), Documentation (6%, 1.5h), Meeting (6%, 1.5h). Feature work is dominating - great if you're in a delivery sprint.",
+};
+
+function getDemoResponse(question: string): string {
+  const q = question.toLowerCase();
+  for (const [key, val] of Object.entries(DEMO_RESPONSES)) {
+    if (key !== 'default' && q.includes(key)) return val;
+  }
+  return DEMO_RESPONSES.default;
+}
+
 export default function ChatPage() {
+  const { isDemoMode } = useAuth();
   const [messages, setMessages] = useState<Message[]>([
     {
       id: '0',
@@ -54,6 +74,18 @@ export default function ChatPage() {
     setMessages(prev => [...prev, userMessage]);
     setInput('');
     setLoading(true);
+
+    if (isDemoMode) {
+      await new Promise(r => setTimeout(r, 800));
+      setMessages(prev => [...prev, {
+        id: (Date.now() + 1).toString(),
+        type: 'assistant',
+        content: getDemoResponse(text),
+        timestamp: new Date(),
+      }]);
+      setLoading(false);
+      return;
+    }
 
     try {
       const result = await chatApi.ask(text.trim());

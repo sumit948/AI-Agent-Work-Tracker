@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { authApi } from '@/lib/api/auth-api';
 import type { AuthResponse } from '@/lib/work-tracker-types';
 
-interface AuthUser {
+export interface AuthUser {
   userId: number;
   name: string;
   email: string;
@@ -14,30 +14,40 @@ interface AuthUser {
 interface AuthContextValue {
   user: AuthUser | null;
   isLoading: boolean;
+  isDemoMode: boolean;
   login: (email: string, password: string) => Promise<void>;
   register: (name: string, email: string, password: string) => Promise<void>;
   logout: () => void;
+  enterDemo: () => void;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
 const TOKEN_KEY = 'wt_token';
-const USER_KEY = 'wt_user';
+const USER_KEY  = 'wt_user';
+const DEMO_KEY  = 'wt_demo';
+
+const DEMO_USER: AuthUser = { userId: 0, name: 'Demo User', email: 'demo@worktracker.ai' };
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const [user, setUser] = useState<AuthUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isDemoMode, setIsDemoMode] = useState(false);
 
   useEffect(() => {
-    const stored = localStorage.getItem(USER_KEY);
-    const token = localStorage.getItem(TOKEN_KEY);
-    if (stored && token) {
-      try {
-        setUser(JSON.parse(stored));
-      } catch {
-        localStorage.removeItem(USER_KEY);
-        localStorage.removeItem(TOKEN_KEY);
+    const isDemo = localStorage.getItem(DEMO_KEY) === 'true';
+    if (isDemo) {
+      setUser(DEMO_USER);
+      setIsDemoMode(true);
+    } else {
+      const stored = localStorage.getItem(USER_KEY);
+      const token  = localStorage.getItem(TOKEN_KEY);
+      if (stored && token) {
+        try { setUser(JSON.parse(stored)); } catch {
+          localStorage.removeItem(USER_KEY);
+          localStorage.removeItem(TOKEN_KEY);
+        }
       }
     }
     setIsLoading(false);
@@ -62,15 +72,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     router.push('/work-tracker');
   }, [handleAuthResponse, router]);
 
+  const enterDemo = useCallback(() => {
+    localStorage.setItem(DEMO_KEY, 'true');
+    setUser(DEMO_USER);
+    setIsDemoMode(true);
+    router.push('/work-tracker');
+  }, [router]);
+
   const logout = useCallback(() => {
     localStorage.removeItem(TOKEN_KEY);
     localStorage.removeItem(USER_KEY);
+    localStorage.removeItem(DEMO_KEY);
     setUser(null);
+    setIsDemoMode(false);
     router.push('/login');
   }, [router]);
 
   return (
-    <AuthContext.Provider value={{ user, isLoading, login, register, logout }}>
+    <AuthContext.Provider value={{ user, isLoading, isDemoMode, login, register, logout, enterDemo }}>
       {children}
     </AuthContext.Provider>
   );

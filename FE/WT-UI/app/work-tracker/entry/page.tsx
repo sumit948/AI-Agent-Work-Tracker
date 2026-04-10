@@ -3,14 +3,16 @@
 import { useState } from 'react';
 import { Header } from '@/components/header';
 import { TaskCard } from '@/components/task-card';
-import { StructuredTask } from '@/lib/work-tracker-types';
+import { StructuredTask, DEMO_TASKS } from '@/lib/work-tracker-types';
 import { logsApi } from '@/lib/api/logs-api';
 import { ApiError } from '@/lib/api-client';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Loader2, Zap } from 'lucide-react';
+import { useAuth } from '@/lib/auth-context';
 
 export default function WorkEntryPage() {
+  const { isDemoMode } = useAuth();
   const [rawText, setRawText] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   const [results, setResults] = useState<StructuredTask[] | null>(null);
@@ -24,6 +26,14 @@ export default function WorkEntryPage() {
 
     setIsProcessing(true);
     setError(null);
+
+    if (isDemoMode) {
+      await new Promise(r => setTimeout(r, 1200));
+      setResults(DEMO_TASKS.slice(0, 3));
+      setRawText('');
+      setIsProcessing(false);
+      return;
+    }
 
     try {
       const response = await logsApi.submitLog(rawText.trim());

@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useState } from 'react';
 import Link from 'next/link';
@@ -7,10 +7,10 @@ import { ApiError } from '@/lib/api-client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Loader2, Zap } from 'lucide-react';
+import { Loader2, Zap, PlayCircle } from 'lucide-react';
 
 export default function LoginPage() {
-  const { login } = useAuth();
+  const { login, enterDemo } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -36,12 +36,31 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-background">
       <div className="w-full max-w-md px-8 py-10 bg-card border border-border rounded-2xl shadow-lg">
-        {/* Logo */}
         <div className="flex items-center gap-2 mb-8 justify-center">
           <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center">
             <Zap className="h-5 w-5 text-primary-foreground" />
           </div>
-          <span className="text-2xl font-bold text-foreground">WorkTracker</span>
+          <span className="text-2xl font-bold text-foreground">WorkTracker AI</span>
+        </div>
+
+        <div className="mb-6 p-4 rounded-xl bg-primary/5 border border-primary/20 flex flex-col items-center gap-2 text-center">
+          <p className="text-sm text-foreground font-medium">Want to explore first?</p>
+          <p className="text-xs text-muted-foreground">Try the live demo — no account needed</p>
+          <Button
+            type="button"
+            variant="default"
+            className="w-full mt-1 gap-2"
+            onClick={enterDemo}
+          >
+            <PlayCircle className="h-4 w-4" />
+            View Live Demo
+          </Button>
+        </div>
+
+        <div className="relative my-5 flex items-center gap-3">
+          <div className="flex-1 border-t border-border" />
+          <span className="text-xs text-muted-foreground uppercase tracking-wider">or sign in</span>
+          <div className="flex-1 border-t border-border" />
         </div>
 
         <h2 className="text-xl font-semibold text-foreground mb-1">Welcome back</h2>
@@ -81,12 +100,19 @@ export default function LoginPage() {
           )}
 
           <Button type="submit" className="w-full" disabled={loading}>
-            {loading ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Signing in...</> : 'Sign In'}
+            {loading ? (
+              <>
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                Signing in...
+              </>
+            ) : (
+              'Sign In'
+            )}
           </Button>
         </form>
 
         <p className="mt-6 text-center text-sm text-muted-foreground">
-          Don&apos;t have an account?{' '}
+          {"Don't have an account? "}
           <Link href="/register" className="text-primary font-medium hover:underline">
             Create one
           </Link>

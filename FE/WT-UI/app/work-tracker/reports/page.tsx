@@ -6,12 +6,14 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { reportsApi } from '@/lib/api/reports-api';
-import { DailyReport, WeeklyReport, categoryColors, categoryLabel } from '@/lib/work-tracker-types';
+import { DailyReport, WeeklyReport, categoryColors, categoryLabel, DEMO_DAILY_REPORT, DEMO_WEEKLY_REPORT } from '@/lib/work-tracker-types';
 import { Download, Mail, Copy, Calendar, Loader2 } from 'lucide-react';
+import { useAuth } from '@/lib/auth-context';
 
 type ReportTab = 'daily' | 'weekly';
 
 export default function ReportsPage() {
+  const { isDemoMode } = useAuth();
   const today = new Date().toISOString().split('T')[0];
   const monday = (() => {
     const d = new Date();
@@ -29,6 +31,7 @@ export default function ReportsPage() {
   const [copied, setCopied] = useState(false);
 
   const loadDaily = (date: string) => {
+    if (isDemoMode) { setDailyReport(DEMO_DAILY_REPORT); return; }
     setLoading(true);
     reportsApi.getDaily(date)
       .then(setDailyReport)
@@ -37,6 +40,7 @@ export default function ReportsPage() {
   };
 
   const loadWeekly = (weekStart: string) => {
+    if (isDemoMode) { setWeeklyReport(DEMO_WEEKLY_REPORT); return; }
     setLoading(true);
     reportsApi.getWeekly(weekStart)
       .then(setWeeklyReport)
@@ -44,13 +48,14 @@ export default function ReportsPage() {
       .finally(() => setLoading(false));
   };
 
-  useEffect(() => { loadDaily(selectedDate); }, []);
+  useEffect(() => { loadDaily(selectedDate); }, [isDemoMode]);
 
   const handleTabChange = (newTab: ReportTab) => {
     setTab(newTab);
     if (newTab === 'daily' && !dailyReport) loadDaily(selectedDate);
     if (newTab === 'weekly' && !weeklyReport) loadWeekly(selectedWeek);
   };
+
 
   const reportText = tab === 'daily' && dailyReport
     ? `Daily Report — ${dailyReport.date}\n\n${dailyReport.summary}\n\nTotal Hours: ${dailyReport.totalHours}h\nTasks: ${dailyReport.taskCount}`

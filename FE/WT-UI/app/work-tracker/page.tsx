@@ -6,18 +6,25 @@ import { StatCard } from '@/components/stat-card';
 import { TaskCard } from '@/components/task-card';
 import { analyticsApi } from '@/lib/api/analytics-api';
 import { logsApi } from '@/lib/api/logs-api';
-import { AnalyticsSummary, StructuredTask } from '@/lib/work-tracker-types';
+import { AnalyticsSummary, StructuredTask, DEMO_ANALYTICS, DEMO_TASKS } from '@/lib/work-tracker-types';
 import { BarChart3, Clock, Zap, TrendingUp, Loader2 } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { useAuth } from '@/lib/auth-context';
 
 export default function DashboardPage() {
-  const { user } = useAuth();
+  const { user, isDemoMode } = useAuth();
   const [analytics, setAnalytics] = useState<AnalyticsSummary | null>(null);
   const [recentTasks, setRecentTasks] = useState<StructuredTask[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    if (isDemoMode) {
+      setAnalytics(DEMO_ANALYTICS);
+      setRecentTasks(DEMO_TASKS);
+      setLoading(false);
+      return;
+    }
+
     const today = new Date().toISOString().split('T')[0];
     const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
 
@@ -32,7 +39,7 @@ export default function DashboardPage() {
       })
       .catch(console.error)
       .finally(() => setLoading(false));
-  }, []);
+  }, [isDemoMode]);
 
   const chartData = (analytics?.dailyTrend ?? []).map(d => ({
     day: new Date(d.date).toLocaleDateString('en', { weekday: 'short' }),
