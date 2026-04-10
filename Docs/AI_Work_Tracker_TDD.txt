@@ -1,0 +1,207 @@
+﻿TECHNICAL DESIGN & IMPLEMENTATION PLAN
+AI-Powered Work Tracker Agent
+Full-Stack Architecture  |  API Design  |  Database Schema  |  AI Integration
+
+
+Document TypeTechnical Design Document (TDD)
+ProjectAI-Powered Work Tracker Agent - Intelligent Productivity Assistant
+BackendJava Spring Boot - REST APIs, Business Logic, AI Orchestration
+FrontendReact.js - Dashboard, Log Entry, Reports, Chat UI
+DatabaseSupabase (PostgreSQL) - via Spring Data JPA
+AI LayerLLM API (OpenAI / Gemini) - Text Structuring & Query Engine
+DeploymentAWS EC2 (Docker) + Vercel/Netlify (Frontend) + Supabase (DB)
+01  HIGH-LEVEL ARCHITECTURE
+
+The system is composed of five layers, each with a clearly defined responsibility. Requests flow top-down from the React frontend through the Spring Boot API layer, through the AI service, and are persisted in Supabase PostgreSQL. AWS handles deployment and optional file storage.
+
+FrontendReact.jsUI, user interactions, API calls, charts, dashboard, chat interface
+API LayerSpring BootREST APIs, business logic, JWT auth, AI orchestration, data processing
+AI ServiceLLM APIConvert raw text → structured JSON, generate summaries, answer queries
+DatabaseSupabase (PostgreSQL)Persist users, raw logs, structured logs, reports - accessed via JPA
+InfrastructureAWS + DockerEC2 for backend deployment, Docker container, S3 (optional), CloudWatch logs
+02  TECH STACK - RESPONSIBILITIES
+
+2.1  Frontend - React.js
+The React frontend is responsible for all user-facing interactions. It communicates with the Spring Boot backend exclusively through REST API calls - it holds no business logic.
+
+Key Pages & Responsibilities
+PagePurposeKey ComponentsLogin / SignupUser authenticationForm, JWT token storageDashboardOverview of today's work and weekly hoursSummary cards, quick log entryWork Log EntryUser pastes or types raw work notesText area, submit buttonReportsView daily and weekly structured reportsReport list, export buttonChat (AI Assistant)Natural language questions about past workChat window, AI response streamAnalyticsVisual breakdown of time and categoriesBar chart, pie chart (Recharts)
+2.2  Backend - Java Spring Boot
+Spring Boot is the backbone of the system. It owns all business logic, security, AI API calls, and data persistence. The frontend is kept thin - Spring Boot does the heavy lifting.
+
+Core Responsibilities
+• Expose all REST APIs consumed by the React frontend
+• Handle JWT-based authentication and route authorization
+• Receive raw work log text and save it to the database
+• Call the LLM API with a structured prompt and parse the JSON response
+• Save the AI-structured output (tasks, categories, hours) to the database
+• Aggregate data for daily/weekly reports and return to frontend
+• Handle chat queries by building context from past logs and calling the LLM
+
+Spring Boot Project Packages
+src/main/java/com/worktracker/
+  controller/     → REST API endpoints (AuthController, LogController, etc.)
+  service/        → Business logic layer
+  repository/     → JPA interfaces for DB access
+  entity/         → JPA entity classes (User, RawLog, StructuredLog)
+  dto/            → Request / Response DTOs
+  config/         → Security config, JWT filter, CORS config
+
+2.3  AI Layer - LLM Integration
+The AI layer is a service class inside Spring Boot - not a separate microservice. When a raw log is submitted, the AIService builds a prompt, calls the LLM API (OpenAI / Gemini), and returns a structured JSON response that is then parsed and saved.
+
+Example - Input / Output
+Input (raw user text):
+"fixed login bug and worked on payment API"
+
+Prompt sent to LLM:
+Convert the following work log into structured JSON.
+Return a JSON array of tasks with: title, category, hours.
+Categories: Bug, Feature, Meeting, Review, Other.
+
+Input: "fixed login bug and worked on payment API"
+
+LLM Response (structured JSON):
+{
+  "tasks": [
+    {
+      "title": "Fix login bug",
+      "category": "Bug",
+      "hours": 2
+    },
+    {
+      "title": "Payment API development",
+      "category": "Feature",
+      "hours": 3
+    }
+  ]
+}
+
+Important Design Rules
+• Always validate AI response - check for valid JSON before saving
+• Add fallback: if AI fails, save raw log with status PENDING and retry
+• Set a timeout on LLM API calls (5-10 seconds) to avoid blocking
+• Log every LLM request/response for debugging and audit
+
+2.4  Database - Supabase (PostgreSQL)
+Supabase provides a hosted PostgreSQL database. Spring Boot connects to it using Spring Data JPA and a standard JDBC connection string. DBeaver can be used for direct visual inspection of tables during development.
+
+Connection Setup
+# application.properties
+spring.datasource.url=jdbc:postgresql://<supabase-host>:5432/postgres
+spring.datasource.username=postgres
+spring.datasource.password=<your-password>
+spring.jpa.hibernate.ddl-auto=update
+spring.jpa.properties.hibernate.dialect=org.hibernate.dialect.PostgreSQLDialect
+
+2.5  AWS + Docker - Deployment Infrastructure
+ServicePurposeNotesAWS EC2Host the Dockerized Spring Boot backendFree tier (t2.micro) - 1GB RAM, 8GB storageAWS S3Optional file storage (exports, voice files)Free tier - 5GB storageAWS CloudWatchApplication logs, error monitoringAuto-integrated with EC2DockerContainerize Spring Boot app for consistent deploymentDockerfile in project rootVercel / NetlifyHost the React frontend (static build)Free tier - instant deploymentsSupabaseManaged PostgreSQL - no server to manageFree tier - 500MB, 2GB bandwidth
+Dockerfile - Spring Boot Backend
+FROM eclipse-temurin:17-jre-alpine
+WORKDIR /app
+COPY target/work-tracker.jar app.jar
+EXPOSE 8080
+ENTRYPOINT ["java", "-jar", "app.jar"]
+
+03  END-TO-END REQUEST FLOW
+
+Below is the complete journey of a work log entry - from user input to structured storage and display.
+
+1. User types raw notes into the Work Log Entry page (React)
+2. React calls POST /api/logs with { userId, rawText } - JWT in Authorization header
+3. Spring Boot AuthFilter validates the JWT token
+4. LogController passes the request to LogService
+5. LogService saves the raw log to the raw_logs table in Supabase
+6. LogService calls AIService.processLog(rawText)
+7. AIService builds the prompt and calls the LLM API (OpenAI / Gemini)
+8. LLM returns structured JSON (tasks, categories, hours)
+9. AIService parses and validates the JSON response
+10. LogService saves each structured task to the structured_logs table
+11. Response (structured tasks) returned to React frontend
+12. React updates the Dashboard and Reports pages with the new data
+
+04  BACKEND API DESIGN
+
+Authentication APIs
+POST/api/auth/registerRegister a new user - accepts name, email, password (BCrypt hashed)
+POST/api/auth/loginAuthenticate user - returns signed JWT access token
+Work Log APIs
+POST/api/logsSubmit raw work log text - triggers AI processing pipeline
+GET/api/logs?userId={id}Retrieve all raw logs for the authenticated user
+GET/api/logs/{id}Get a single log entry with its structured tasks
+AI Processing API
+POST/api/ai/process-logManually trigger AI processing on a raw log (admin/retry use)
+Reports API
+GET/api/reports/daily?date={date}Get structured tasks and total hours for a specific date
+GET/api/reports/weekly?week={weekStart}Get aggregated tasks and category breakdown for a week
+Chat / Query API
+POST/api/chatSend a natural language question - AI answers from log history
+Chat Request Body:
+{
+  "question": "What did I work on last week?"
+}
+
+Chat Response:
+{
+  "answer": "Last week you fixed the login bug (2h), developed the
+             payment API (3h), and attended the sprint planning (1h).
+             Total: 6 hours across Bug, Feature, and Meeting categories."
+}
+
+05  DATABASE SCHEMA DESIGN
+
+  users
+ColumnTypeNotesidBIGINT (PK)Auto-increment primary keynameVARCHAR(100)Full nameemailVARCHAR(150)Unique - used for loginpasswordVARCHAR(255)BCrypt hashed - never stored plaincreated_atTIMESTAMPAccount creation time
+  raw_logs
+ColumnTypeNotesidBIGINT (PK)Auto-increment primary keyuser_idBIGINT (FK)References users.idraw_textTEXTOriginal user input - never modifiedai_statusVARCHAR(20)PENDING / PROCESSED / FAILEDcreated_atTIMESTAMPLog submission time
+  structured_logs
+ColumnTypeNotesidBIGINT (PK)Auto-increment primary keyuser_idBIGINT (FK)References users.idraw_log_idBIGINT (FK)References raw_logs.idtask_titleVARCHAR(255)AI-extracted task namecategoryVARCHAR(50)Bug / Feature / Meeting / Review / OtherhoursDECIMAL(4,1)AI-estimated effort in hourslog_dateDATEDate of work (from raw_log created_at)
+  reports
+ColumnTypeNotesidBIGINT (PK)Auto-increment primary keyuser_idBIGINT (FK)References users.idreport_typeVARCHAR(20)DAILY / WEEKLYcontentTEXTAI-generated report text (JSON or plain)period_startDATEReport period start datecreated_atTIMESTAMPReport generation time
+06  AI INTEGRATION FLOW - DETAILED
+
+The AI integration is handled entirely within the Spring Boot backend. The frontend never calls the LLM directly - all prompts, API keys, and response parsing are server-side.
+
+Step-by-Step Flow in AIService.java
+13. Receive rawText from LogService
+14. Build structured prompt (see template below)
+15. Call LLM REST API with API key from environment variable
+16. Receive raw text response from LLM
+17. Extract JSON block from response using regex / string parsing
+18. Validate JSON structure - check required fields exist
+19. If valid: return parsed task list to LogService
+20. If invalid or error: log the failure, set ai_status = FAILED, return empty list
+
+Prompt Template
+You are a work log parser. Convert the input into structured JSON.
+
+Rules:
+- Return ONLY valid JSON, no explanation text
+- Categories must be one of: Bug, Feature, Meeting, Review, Other
+- Estimate hours based on typical task complexity
+- If multiple tasks, return all in the tasks array
+
+Format:
+{ "tasks": [{ "title": "...", "category": "...", "hours": 0.0 }] }
+
+Input: {rawText}
+
+07  ANALYTICS DESIGN
+
+The Analytics Dashboard gives users visual insight into their productivity patterns. All data is aggregated server-side and returned as clean JSON for the React charts.
+
+MetricChart TypeData SourceReact LibraryTotal hours per dayBar chartSUM(hours) GROUP BY log_dateRecharts - BarChartCategory distributionPie / Donut chartCOUNT(*) GROUP BY categoryRecharts - PieChartWeekly trendLine chartWeekly hours over timeRecharts - LineChartTop task typesHorizontal barMost frequent task titlesRecharts - BarChart
+08  SECURITY DESIGN
+
+LayerMechanismDetailAuthenticationJWT (JSON Web Token)Signed token issued on login - expires in 24 hoursPassword storageBCrypt hashingSalted hash - never store plain text passwordsRoute protectionSpring Security filterJWT filter validates token on every protected routeUser isolationuserId scoping in queriesEvery DB query filters by authenticated userIdAPI key securityEnvironment variablesLLM API key stored in ENV - never in source codeCORS policySpring Security CORS configOnly allow requests from known frontend domain
+09  DEPLOYMENT PLAN
+
+Local Development Setup
+ServiceURLHow to RunReact Frontendhttp://localhost:3000npm startSpring Boot Backendhttp://localhost:8080mvn spring-boot:runSupabase DBcloud.supabase.comNo local setup - connect via JDBC
+Production Deployment
+ComponentPlatformStepsReact FrontendVercel / Netlifynpm run build → deploy dist/ folder - auto HTTPSSpring Boot BackendAWS EC2 (Docker)docker build → docker run -p 8080:8080 - configure security groupDatabaseSupabase (cloud)No deployment needed - update JDBC URL in ENV variablesMonitoringAWS CloudWatchAuto-collects EC2 logs - set up alarms for errors
+10  ADVANCED FEATURES - ROADMAP
+
+FeatureTech RequiredComplexityVoice-to-text loggingOpenAI Whisper API - audio file → transcribed textMediumEmail digestJavaMail / AWS SES - send weekly summary to inboxLowCalendar syncGoogle Calendar API - pull meetings into logs automaticallyMediumSlack integrationSlack Bolt SDK - log work directly from Slack messageMediumJira auto-syncJira REST API - push structured tasks to Jira ticketsHighKafka event streamingApache Kafka - async AI processing at scaleHighSmart remindersScheduled jobs (Spring @Scheduled) - end-of-day nudgeLowAI feedbackWeekly LLM summary of productivity patternsLow
+
+AI-Powered Work Tracker Agent  -  Technical Design & Implementation Plan
